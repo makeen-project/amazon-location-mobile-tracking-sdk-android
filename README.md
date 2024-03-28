@@ -8,7 +8,7 @@ This tracking SDK works with the overall AWS SDK and the Amazon Location Authent
 
 Add the following lines to the dependencies section of your build.gradle file in Android Studio:
 
-```
+``` gradle
 implementation("software.amazon.location:tracking:0.0.1")
 implementation("software.amazon.location:auth:0.0.1")
 implementation("com.amazonaws:aws-android-sdk-location:2.72.0")
@@ -82,7 +82,7 @@ LocationTrackerConfig(
 
 To utilize background location, include the following permission and service entries within your `AndroidManifest.xml` file.
 
-```
+``` xml
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 <application>
@@ -98,7 +98,7 @@ To utilize background location, include the following permission and service ent
 
 Import the following classes in your code:
 
-```
+``` kotlin
 import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.config.LocationTrackerConfig
 import software.amazon.location.tracking.util.TrackingSdkLogLevel
@@ -111,7 +111,7 @@ import software.amazon.location.auth.LocationCredentialsProvider
 
 Create an `AuthHelper` as we need `LocationCredentialsProvider` for creating `LocationTracker`:
 
-```
+``` kotlin
 // Create an authentication helper using credentials from Cognito
 private fun exampleCognitoLogin() {
         val authHelper = AuthHelper(applicationContext)
@@ -121,7 +121,7 @@ private fun exampleCognitoLogin() {
 
 Use the `LocationCredentialsProvider` and `LocationTrackerConfig` to create a `LocationTracker`:
 
-```
+``` kotlin
 val config = LocationTrackerConfig(
     trackerName = "MY-TRACKER-NAME",
     logLevel = TrackingSdkLogLevel.DEBUG,
@@ -140,7 +140,7 @@ locationTracker = LocationTracker(
 
 You can use the `LocationTracker` to get the device's location and upload it:
 
-```
+``` kotlin
 locationTracker?.getDeviceLocation(object :LocationTrackingCallback{
       override fun onLocationReceived(location: LocationEntry) {
       }
@@ -161,7 +161,7 @@ locationTracker?.getDeviceLocation(object :LocationTrackingCallback{
 
 You can use the `LocationTracker` to start and stop tracking in the foreground. Here is an example:
 
-```
+``` kotlin
 // Starting location tracking
 locationTracker?.start(object :LocationTrackingCallback{
       override fun onLocationReceived(location: LocationEntry) {
@@ -186,7 +186,7 @@ locationTracker?.stop()
 
 You can also use the `LocationTracker` to start and stop tracking in the background. Here is an example:
 
-```
+``` kotlin
 // Starting location tracking
 locationTracker?.startBackground(
     BackgroundTrackingMode.ACTIVE_TRACKING,
@@ -207,17 +207,15 @@ locationTracker?.stopBackgroundService()
 
 ## How to use filters
 
-With Amazon Location Service Mobile Tracking SDK, you will get three inbuilt location filters mentioned below:
+The Amazon Location Service Mobile Tracking SDK includes three location filters:
 
-```
-TimeLocationFilter -> Filter that determines if the current location should be uploaded based on a defined time interval.
-DistanceLocationFilter -> Filters location updates based on a specified distance threshold.
-AccuracyLocationFilter -> Filters location updates by comparing the distance moved since the last update with the current location's accuracy.
-```
+* TimeLocationFilter: Filters location updates based on a defined time interval.
+* DistanceLocationFilter: Filters location updates based on a specified distance threshold.
+* AccuracyLocationFilter: Filters location updates by comparing the distance moved since the last update with the current location's accuracy.
 
 Filters can be added when the tracker is initially configured. They can also be adjusted during runtime. Here is an example of using a filter in the initial configuration:
 
-```
+``` kotlin
 val config = LocationTrackerConfig(
     trackerName = "MY-TRACKER-NAME",
     logLevel = TrackingSdkLogLevel.DEBUG,
@@ -237,7 +235,7 @@ locationTracker = LocationTracker(
 
 Custom filters can be added when the tracker is initially configured. Here is an example of using a custom filter in the initial configuration:
 
-```
+``` kotlin
 // Custom filter added to the location filters list. This filter checks if the current location's time corresponds to Monday.
 val config = LocationTrackerConfig(
     trackerName = "MY-TRACKER-NAME",
@@ -274,7 +272,7 @@ locationTracker = LocationTracker(
 
 Filters can be enabled or disabled at runtime with `LocationTracker`. Here is an example:
 
-```
+``` kotlin
 // To enable the filter
 locationTracker?.enableFilter(TimeLocationFilter())
 
