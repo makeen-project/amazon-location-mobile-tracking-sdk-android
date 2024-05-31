@@ -80,10 +80,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
-    implementation("com.amazonaws:aws-android-sdk-mobile-client:2.73.0")
-    implementation("com.amazonaws:aws-android-sdk-auth-userpools:2.73.0")
-    implementation("com.amazonaws:aws-android-sdk-location:2.72.0")
+    implementation("com.google.code.gson:gson:2.10.1")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation("aws.sdk.kotlin:location:1.2.21")
 
     if (findProject(":authSdk") != null) {
         implementation(project(":authSdk"))

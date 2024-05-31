@@ -6,9 +6,8 @@ import android.location.Location
 import android.os.Build
 import androidx.annotation.RequiresPermission
 import androidx.room.Room
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
-import com.amazonaws.services.geo.AmazonLocationClient
-import com.amazonaws.services.geo.model.ResourceNotFoundException
+import aws.sdk.kotlin.services.location.model.ResourceNotFoundException
+import aws.smithy.kotlin.runtime.time.epochMilliseconds
 import software.amazon.location.tracking.aws.AmazonTrackingHttpClient
 import software.amazon.location.tracking.aws.LocationTrackingCallback
 import software.amazon.location.tracking.config.LocationTrackerConfig
@@ -33,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.tracking.filters.AccuracyLocationFilter
 import software.amazon.location.tracking.filters.DistanceLocationFilter
@@ -60,10 +60,9 @@ class LocationTracker {
         clientConfig = GsonBuilder()
             .registerTypeAdapter(LocationFilter::class.java, LocationFilterAdapter())
             .create().fromJson(
-                AWSKeyValueStore(
+                EncryptedSharedPreferences(
                     context,
-                    PREFS_NAME,
-                    true
+                    PREFS_NAME
                 ).get(StoreKey.CLIENT_CONFIG) ?: throw Exception("Client config not found"),
                 LocationTrackerConfig::class.java
             )
@@ -97,13 +96,8 @@ class LocationTracker {
             LocationDatabase::class.java,
             DB_NAME,
         ).build()
-        amazonLocationClient =
-            AmazonLocationClient(locationCredentialsProvider.getCredentialsProvider())
-        awsKeyValueStore = AWSKeyValueStore(
-            context,
-            PREFS_NAME,
-            true,
-        )
+        securePreferences = EncryptedSharedPreferences(context, PREFS_NAME)
+        securePreferences?.initEncryptedSharedPreferences()
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
@@ -134,17 +128,16 @@ class LocationTracker {
         val gson = GsonBuilder()
             .registerTypeAdapter(LocationFilter::class.java, LocationFilterAdapter())
             .create()
-        awsKeyValueStore.put(StoreKey.CLIENT_CONFIG, gson.toJson(clientConfig))
+        securePreferences?.put(StoreKey.CLIENT_CONFIG, gson.toJson(clientConfig))
     }
 
     private var locationTrackingCallback: LocationTrackingCallback? = null
     private var locationCredentialsProvider: LocationCredentialsProvider? = null
     private var locationProvider: LocationProvider
     private var httpClient: AmazonTrackingHttpClient
-    private var amazonLocationClient: AmazonLocationClient
     private var database: LocationDatabase
     private val coroutineScope: CoroutineScope
-    private var awsKeyValueStore: AWSKeyValueStore
+    private var securePreferences: EncryptedSharedPreferences? = null
     private var locationCallback: LocationCallback
     private var context: Context? = null
 
@@ -155,7 +148,7 @@ class LocationTracker {
     @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
     fun start(locationTrackingCallback: LocationTrackingCallback) {
         this.locationTrackingCallback = locationTrackingCallback
-        awsKeyValueStore.put(StoreKey.TRACKING_IN_PROGRESS, true.toString())
+        securePreferences?.put(StoreKey.TRACKING_IN_PROGRESS, true.toString())
         locationProvider.subscribeToLocationUpdates(locationCallback)
     }
 
@@ -164,7 +157,7 @@ class LocationTracker {
      */
     @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
     fun startBackgroundLocationUpdates() {
-        awsKeyValueStore.put(StoreKey.BG_TRACKING_IN_PROGRESS, true.toString())
+        securePreferences?.put(StoreKey.BG_TRACKING_IN_PROGRESS, true.toString())
         locationProvider.subscribeToLocationUpdates(locationCallback)
     }
 
@@ -173,14 +166,14 @@ class LocationTracker {
      * @return True if tracking is in progress; false otherwise.
      */
     fun isTrackingInForeground(): Boolean {
-        return awsKeyValueStore.get(StoreKey.TRACKING_IN_PROGRESS)?.toBoolean() ?: false
+        return securePreferences?.get(StoreKey.TRACKING_IN_PROGRESS)?.toBoolean() ?: false
     }
 
     /**
      * Unsubscribes from location updates, stopping the location tracking.
      */
     fun stop() {
-        awsKeyValueStore.put(StoreKey.TRACKING_IN_PROGRESS, false.toString())
+        securePreferences?.put(StoreKey.TRACKING_IN_PROGRESS, false.toString())
         locationProvider.unsubscribeFromLocationUpdates(locationCallback)
     }
 
@@ -188,7 +181,7 @@ class LocationTracker {
      * Unsubscribes from background location updates, stopping the location tracking.
      */
     fun stopBackgroundLocationUpdates() {
-        awsKeyValueStore.put(StoreKey.BG_TRACKING_IN_PROGRESS, false.toString())
+        securePreferences?.put(StoreKey.BG_TRACKING_IN_PROGRESS, false.toString())
         locationProvider.unsubscribeFromLocationUpdates(locationCallback)
     }
 
@@ -203,9 +196,9 @@ class LocationTracker {
         val locationsToUpload = allEntries.filter { location ->
             clientConfig.locationFilters.all { filter ->
                 val isFilterEnabled = when (filter) {
-                    is TimeLocationFilter -> awsKeyValueStore.get(IS_TIME_FILTER_ENABLE)?.toBoolean() ?: false
-                    is DistanceLocationFilter -> awsKeyValueStore.get(IS_DISTANCE_FILTER_ENABLE)?.toBoolean() ?: false
-                    is AccuracyLocationFilter -> awsKeyValueStore.get(IS_ACCURACY_FILTER_ENABLE)?.toBoolean() ?: false
+                    is TimeLocationFilter -> securePreferences?.get(IS_TIME_FILTER_ENABLE)?.toBoolean() ?: false
+                    is DistanceLocationFilter -> securePreferences?.get(IS_DISTANCE_FILTER_ENABLE)?.toBoolean() ?: false
+                    is AccuracyLocationFilter -> securePreferences?.get(IS_ACCURACY_FILTER_ENABLE)?.toBoolean() ?: false
                     else -> true
                 }
                 if (isFilterEnabled) {
@@ -260,15 +253,18 @@ class LocationTracker {
      * @return The device Location from AWS or null if the device location is not found or an error occurs.
      */
     suspend fun getTrackerDeviceLocation(): Location? {
+        validateAndRefreshLocationCredentials()
         return try {
             val deviceLocation = httpClient.getTrackerDeviceLocation(
-                amazonLocationClient,
+                locationCredentialsProvider,
             )
-            Location("").apply {
-                latitude = deviceLocation.position[1]
-                longitude = deviceLocation.position[0]
-                time = deviceLocation.sampleTime.time
-                accuracy = deviceLocation.accuracy?.horizontal?.toFloat() ?: 0f
+            deviceLocation?.let {
+                Location("").apply {
+                    latitude = it.position[1]
+                    longitude = it.position[0]
+                    time = it.sampleTime.epochMilliseconds
+                    accuracy = it.accuracy?.horizontal?.toFloat() ?: 0f
+                }
             }
         } catch (e: ResourceNotFoundException) {
             Logger.log("records not found for given deviceId", e)
@@ -277,9 +273,27 @@ class LocationTracker {
     }
 
     /**
+     * Validates and refreshes the credentials of the location client if necessary.
+     *
+     * This function checks whether the location credentials provider is available.
+     * If the credentials are not valid, it triggers a verification and refresh process.
+     *
+     * @throws Exception if the location credentials provider is not available.
+     */
+    private suspend fun validateAndRefreshLocationCredentials() {
+        if (locationCredentialsProvider == null) throw Exception("Location Credentials Provider not available")
+        locationCredentialsProvider?.let {
+            if (!it.isCredentialsValid()) {
+                it.verifyAndRefreshCredentials()
+            }
+        }
+    }
+
+    /**
      * Uploads locations to AWS using the Amazon Location Service.
      */
     private suspend fun uploadLocationUpdates(locationChunk: Array<LocationEntry>) {
+        validateAndRefreshLocationCredentials()
         val locationsToUpload = locationChunk.map {
             Location("LocationProvider").apply {
                 latitude = it.latitude
@@ -289,19 +303,19 @@ class LocationTracker {
         }.toTypedArray()
 
         val result = httpClient.updateTrackerDeviceLocation(
-            amazonLocationClient,
+            locationCredentialsProvider,
             locationsToUpload,
         )
 
         if (result != null) {
             val entryIdsToDelete = locationChunk.map { it.id }
             database.locationEntryDao().deleteEntriesByIds(entryIdsToDelete)
-            awsKeyValueStore.put(StoreKey.LAST_LOCATION, Gson().toJson(locationChunk.last()))
+            securePreferences?.put(StoreKey.LAST_LOCATION, Gson().toJson(locationChunk.last()))
         }
     }
 
     private fun getLastKnownLocation(): LocationEntry? =
-        awsKeyValueStore.get(StoreKey.LAST_LOCATION)?.let {
+        securePreferences?.get(StoreKey.LAST_LOCATION)?.let {
             Gson().fromJson(it, LocationEntry::class.java)
         }
 
@@ -361,14 +375,14 @@ class LocationTracker {
 
     fun enableFilter(filter: LocationFilter) {
         when (filter) {
-            is TimeLocationFilter -> awsKeyValueStore.put(IS_TIME_FILTER_ENABLE, true.toString())
-            is DistanceLocationFilter -> awsKeyValueStore.put(IS_DISTANCE_FILTER_ENABLE, true.toString())
-            is AccuracyLocationFilter -> awsKeyValueStore.put(IS_ACCURACY_FILTER_ENABLE, true.toString())
+            is TimeLocationFilter -> securePreferences?.put(IS_TIME_FILTER_ENABLE, true.toString())
+            is DistanceLocationFilter -> securePreferences?.put(IS_DISTANCE_FILTER_ENABLE, true.toString())
+            is AccuracyLocationFilter -> securePreferences?.put(IS_ACCURACY_FILTER_ENABLE, true.toString())
         }
         checkFilterIsExistsAndUpdateValue(filter)
     }
 
-    fun checkFilterIsExistsAndUpdateValue(filter: LocationFilter) {
+    private fun checkFilterIsExistsAndUpdateValue(filter: LocationFilter) {
         val existingFilter = clientConfig.locationFilters.find { it::class == filter::class }
         if (existingFilter != null) {
             when (existingFilter) {
@@ -391,9 +405,9 @@ class LocationTracker {
 
     fun disableFilter(filter: LocationFilter) {
         when (filter) {
-            is TimeLocationFilter -> awsKeyValueStore.put(IS_TIME_FILTER_ENABLE, false.toString())
-            is DistanceLocationFilter -> awsKeyValueStore.put(IS_DISTANCE_FILTER_ENABLE, false.toString())
-            is AccuracyLocationFilter -> awsKeyValueStore.put(IS_ACCURACY_FILTER_ENABLE, false.toString())
+            is TimeLocationFilter -> securePreferences?.put(IS_TIME_FILTER_ENABLE, false.toString())
+            is DistanceLocationFilter -> securePreferences?.put(IS_DISTANCE_FILTER_ENABLE, false.toString())
+            is AccuracyLocationFilter -> securePreferences?.put(IS_ACCURACY_FILTER_ENABLE, false.toString())
         }
     }
 }

@@ -1,9 +1,9 @@
 package software.amazon.location.tracking.providers
 
 import android.content.Context
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
 import software.amazon.location.tracking.util.StoreKey
 import java.util.UUID
+import software.amazon.location.auth.EncryptedSharedPreferences
 
 /**
  *  Class providing Device Id generated with UUID.
@@ -13,10 +13,9 @@ import java.util.UUID
  * @param context The application context.
  */
 class DeviceIdProvider(context: Context) {
-    private var awsKeyValueStore: AWSKeyValueStore = AWSKeyValueStore(
+    private var securePreferences: EncryptedSharedPreferences = EncryptedSharedPreferences(
         context,
-        "software.amazon.location.tracking.deviceId",
-        true
+        "software.amazon.location.tracking.deviceId"
     )
 
     companion object {
@@ -32,26 +31,27 @@ class DeviceIdProvider(context: Context) {
     }
 
     init {
+        securePreferences.initEncryptedSharedPreferences()
         setDeviceID()
     }
 
     /**
      *  Method to get the deviceId
      */
-    fun getDeviceID(): String = awsKeyValueStore.get(StoreKey.DEVICE_ID)
+    fun getDeviceID(): String = securePreferences.get(StoreKey.DEVICE_ID) ?: ""
 
     /**
      * Method to clear the deviceId
      */
-    fun resetDeviceID() = awsKeyValueStore.clear()
+    fun resetDeviceID() = securePreferences.clear()
 
     /**
      * Method to set the deviceId, generates one if not provided
      * @param newDeviceID The new deviceId to be set
      */
     private fun setDeviceID(newDeviceID: String? = null) {
-        if (awsKeyValueStore.contains(StoreKey.DEVICE_ID)) return
-        awsKeyValueStore.put(StoreKey.DEVICE_ID, newDeviceID ?: generateDeviceID())
+        if (securePreferences.contains(StoreKey.DEVICE_ID)) return
+        securePreferences.put(StoreKey.DEVICE_ID, newDeviceID ?: generateDeviceID())
     }
 
     /**
