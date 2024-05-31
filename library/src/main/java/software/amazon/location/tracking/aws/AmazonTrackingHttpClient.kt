@@ -2,69 +2,84 @@ package software.amazon.location.tracking.aws
 
 import android.content.Context
 import android.location.Location
-import com.amazonaws.services.geo.AmazonLocationClient
-import com.amazonaws.services.geo.model.BatchUpdateDevicePositionRequest
-import com.amazonaws.services.geo.model.BatchUpdateDevicePositionResult
-import com.amazonaws.services.geo.model.DevicePositionUpdate
-import com.amazonaws.services.geo.model.GetDevicePositionRequest
-import com.amazonaws.services.geo.model.GetDevicePositionResult
+import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesRequest
+import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesResponse
+import aws.sdk.kotlin.services.location.model.BatchUpdateDevicePositionRequest
+import aws.sdk.kotlin.services.location.model.BatchUpdateDevicePositionResponse
+import aws.sdk.kotlin.services.location.model.DevicePositionUpdate
+import aws.sdk.kotlin.services.location.model.GetDevicePositionRequest
+import aws.sdk.kotlin.services.location.model.GetDevicePositionResponse
+import aws.smithy.kotlin.runtime.time.Instant
+import aws.smithy.kotlin.runtime.time.fromEpochMilliseconds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.tracking.config.SdkConfig.MAX_RETRY
 import software.amazon.location.tracking.providers.DeviceIdProvider
 import software.amazon.location.tracking.util.Logger
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.util.Date
 
 /**
- * Handles interactions with Amazon Location tracking.
+ * Handles interactions with Amazon Location tracking services.
+ *
  * @param context the application context
- * @param trackerName the name of the tracker
+ * @param mTrackerName the name of the tracker
  */
-class AmazonTrackingHttpClient(context: Context, private val trackerName: String) {
+class AmazonTrackingHttpClient(context: Context, private val mTrackerName: String) {
     private var deviceIdProvider: DeviceIdProvider = DeviceIdProvider(context)
 
     /**
-     * Updates a single device location.
-     * @param amazonLocationClient the client used to interact with Amazon Location Service
+     * Updates the single location.
+     *
+     * This function sends a single device location to Amazon Location Service.
+     *
+     * @param locationCredentialsProvider provides the client used to interact with Amazon Location Service
      * @param location the location to update
-     * @return BatchUpdateDevicePositionResult containing the result of the update operation
+     * @return BatchUpdateDevicePositionResponse containing the result of the update operation
      */
     suspend fun updateTrackerDeviceLocation(
-        amazonLocationClient: AmazonLocationClient,
+        locationCredentialsProvider: LocationCredentialsProvider?,
         location: Location,
-    ): BatchUpdateDevicePositionResult? {
+    ): BatchUpdateDevicePositionResponse? {
         return updateTrackerDeviceLocation(
-            amazonLocationClient,
+            locationCredentialsProvider,
             arrayOf(location),
         )
     }
 
     /**
      * Updates multiple device locations.
-     * @param amazonLocationClient the client used to interact with Amazon Location Service
-     * @param locations the locations to update
-     * @return BatchUpdateDevicePositionResult containing the result of the update operation
+     *
+     * This function sends a batch of device locations to Amazon Location Service. It retries the operation
+     * up to MAX_RETRY times in case of failure.
+     *
+     * @param locationCredentialsProvider provides the client used to interact with Amazon Location Service
+     * @param locations an array of locations to update
+     * @return BatchUpdateDevicePositionResponse containing the result of the update operation, or null if the update fails
+     * @throws Exception if the update fails after the maximum number of retries
      */
     suspend fun updateTrackerDeviceLocation(
-        amazonLocationClient: AmazonLocationClient,
+        locationCredentialsProvider: LocationCredentialsProvider?,
         locations: Array<Location>,
-    ): BatchUpdateDevicePositionResult? {
+    ): BatchUpdateDevicePositionResponse? {
         var retries = 0
         val deviceID = deviceIdProvider.getDeviceID()
-        val updates = locations.map { location ->
-            DevicePositionUpdate()
-                .withSampleTime(Date(location.time))
-                .withDeviceId(deviceID)
-                .withPosition(location.longitude, location.latitude)
+        val mUpdates = locations.map { location ->
+            DevicePositionUpdate {
+                this.deviceId = deviceID
+                this.sampleTime = Instant.fromEpochMilliseconds(location.time)
+                this.position = listOf(location.longitude, location.latitude)
+            }
         }
-        val batchUpdateRequest = BatchUpdateDevicePositionRequest()
-            .withTrackerName(trackerName)
-            .withUpdates(updates)
-
+        val batchUpdateRequest = BatchUpdateDevicePositionRequest {
+            trackerName = mTrackerName
+            updates = mUpdates
+        }
         while (retries < MAX_RETRY) {
             try {
-                return withContext(Dispatchers.Default) {
-                    amazonLocationClient.batchUpdateDevicePosition(batchUpdateRequest)
+                locationCredentialsProvider?.let {
+                    return withContext(Dispatchers.Default) {
+                        it.getLocationClient()?.batchUpdateDevicePosition(batchUpdateRequest)
+                    }
                 }
             } catch (e: Exception) {
                 Logger.log("Update failed. Retrying... (${retries + 1}/$MAX_RETRY)", e)
@@ -80,18 +95,57 @@ class AmazonTrackingHttpClient(context: Context, private val trackerName: String
 
     /**
      * Retrieves the current device location.
-     * @param amazonLocationClient the client used to interact with Amazon Location Service
-     * @return GetDevicePositionResult containing the result of the retrieval operation
+     *
+     * This function retrieves the last location of a device from Amazon Location Service.
+     *
+     * @param locationCredentialsProvider provides the client used to interact with Amazon Location Service
+     * @return GetDevicePositionResponse containing the result of the retrieval operation
      */
     suspend fun getTrackerDeviceLocation(
-        amazonLocationClient: AmazonLocationClient,
-    ): GetDevicePositionResult {
+        locationCredentialsProvider: LocationCredentialsProvider?,
+    ): GetDevicePositionResponse? {
+        if (locationCredentialsProvider?.getLocationClient() == null) throw Exception("Failed to get credentials")
         val deviceID = deviceIdProvider.getDeviceID()
+        val request = GetDevicePositionRequest {
+            this.trackerName = mTrackerName
+            this.deviceId = deviceID
+        }
         return withContext(Dispatchers.IO) {
-            amazonLocationClient.getDevicePosition(
-                GetDevicePositionRequest()
-                    .withDeviceId(deviceID)
-                    .withTrackerName(trackerName),
+            locationCredentialsProvider.getLocationClient()?.getDevicePosition(
+                request
+            )
+        }
+    }
+
+    /**
+     * Evaluates geofences for a given location.
+     *
+     * This function evaluates geofences for a given device location using Amazon Location Service.
+     *
+     * @param locationCredentialsProvider provides the client used to interact with Amazon Location Service
+     * @param geofenceCollectionName the name of the geofence collection
+     * @param location the location to evaluate
+     * @return BatchEvaluateGeofencesResponse containing the result of the evaluation
+     */
+    suspend fun batchEvaluateGeofences(
+        locationCredentialsProvider: LocationCredentialsProvider?,
+        geofenceCollectionName: String,
+        location: Location
+    ): BatchEvaluateGeofencesResponse? {
+        if (locationCredentialsProvider?.getLocationClient() == null) throw Exception("Failed to get credentials")
+        val deviceID = deviceIdProvider.getDeviceID()
+        val devicePosition = DevicePositionUpdate {
+            this.deviceId = deviceID
+            this.sampleTime = Instant.fromEpochMilliseconds(location.time)
+            this.position = listOf(location.longitude, location.latitude)
+        }
+        val request = BatchEvaluateGeofencesRequest {
+            this.collectionName = geofenceCollectionName
+            this.devicePositionUpdates = listOf(devicePosition)
+        }
+        return withContext(Dispatchers.IO) {
+            locationCredentialsProvider.getLocationClient()?.batchEvaluateGeofences(
+                request
             )
         }
     }
