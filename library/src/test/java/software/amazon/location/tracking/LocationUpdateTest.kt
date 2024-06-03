@@ -4,26 +4,32 @@ import android.content.Context
 import android.location.Location
 import android.os.Looper
 import android.util.Log
-import com.amazonaws.AmazonClientException
-import com.amazonaws.services.geo.AmazonLocationClient
-import com.amazonaws.services.geo.model.BatchUpdateDevicePositionRequest
-import com.amazonaws.services.geo.model.BatchUpdateDevicePositionResult
-import com.amazonaws.services.geo.model.GetDevicePositionRequest
-import com.amazonaws.services.geo.model.GetDevicePositionResult
+import aws.sdk.kotlin.services.location.LocationClient
+import aws.sdk.kotlin.services.location.model.BatchUpdateDevicePositionRequest
+import aws.sdk.kotlin.services.location.model.BatchUpdateDevicePositionResponse
+import aws.sdk.kotlin.services.location.model.GetDevicePositionRequest
+import aws.sdk.kotlin.services.location.model.GetDevicePositionResponse
+import aws.smithy.kotlin.runtime.time.epochMilliseconds
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkConstructor
 import io.mockk.mockkStatic
-import io.mockk.verify
+import io.mockk.runs
 import junit.framework.TestCase.assertEquals
+import kotlin.test.assertNotNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
+import software.amazon.location.auth.EncryptedSharedPreferences
+import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.tracking.aws.AmazonTrackingHttpClient
 import software.amazon.location.tracking.config.SdkConfig.MAX_RETRY
 import software.amazon.location.tracking.providers.DeviceIdProvider
-import kotlin.test.assertNotNull
+import software.amazon.location.tracking.util.StoreKey
 
 class LocationUpdateTest {
     private lateinit var context: Context
@@ -31,7 +37,10 @@ class LocationUpdateTest {
     fun setUp() {
         context = mockk(relaxed = true)
         mockkStatic(Log::class)
-
+        mockkConstructor(EncryptedSharedPreferences::class)
+        every { anyConstructed<EncryptedSharedPreferences>().initEncryptedSharedPreferences() } just runs
+        every { anyConstructed<EncryptedSharedPreferences>().get(any()) } returns "mockDeviceID"
+        every { anyConstructed<EncryptedSharedPreferences>().contains(StoreKey.DEVICE_ID) } returns true
         every { Log.d(any(), any()) } returns 0
         every { Log.e(any(), any(), any()) } returns 0
         mockkStatic(Looper::class)
@@ -39,18 +48,21 @@ class LocationUpdateTest {
 
     @Test
     fun `test update Tracker Device Locations`() {
-        val mockAmazonLocationClient = mockk<AmazonLocationClient>()
+        val locationCredentialProvider = mockk<LocationCredentialsProvider>()
+        val mockAmazonLocationClient = mockk<LocationClient>()
         val mockLocation = mockk<Location>()
         val mockDeviceIdProvider = mockk<DeviceIdProvider>()
 
         val deviceID = "mockDeviceID"
         every { mockDeviceIdProvider.getDeviceID() } returns deviceID
-
+        coEvery {
+            locationCredentialProvider.getLocationClient()
+        } returns mockAmazonLocationClient
         val currentTimeMillis = System.currentTimeMillis()
         every { mockLocation.time } returns currentTimeMillis
         every { mockLocation.latitude } returns 23.455
         every { mockLocation.longitude } returns 103.556
-        val exception = AmazonClientException("Mock exception")
+        val exception = Exception("Mock exception")
         coEvery {
             mockAmazonLocationClient.batchUpdateDevicePosition(any())
         } throws exception
@@ -60,11 +72,11 @@ class LocationUpdateTest {
         runBlocking(Dispatchers.Default) {
             try {
                 amazonTrackingHttpClient.updateTrackerDeviceLocation(
-                    mockAmazonLocationClient,
+                    locationCredentialProvider,
                     arrayOf(mockLocation)
                 )
-            } catch (e: AmazonClientException) {
-                verify(exactly = MAX_RETRY) {
+            } catch (e: Exception) {
+                coVerify(exactly = MAX_RETRY) {
                     mockAmazonLocationClient.batchUpdateDevicePosition(any())
                 }
             }
@@ -73,21 +85,24 @@ class LocationUpdateTest {
 
     @Test
     fun `test get Tracker Device Location`() {
-        val mockAmazonLocationClient = mockk<AmazonLocationClient>()
+        val locationCredentialProvider = mockk<LocationCredentialsProvider>()
+        val mockAmazonLocationClient = mockk<LocationClient>()
         val mockDeviceIdProvider = mockk<DeviceIdProvider>()
 
         val deviceID = "mockDeviceID"
         every { mockDeviceIdProvider.getDeviceID() } returns deviceID
-
+        coEvery {
+            locationCredentialProvider.getLocationClient()
+        } returns mockAmazonLocationClient
         val amazonTrackingHttpClient = AmazonTrackingHttpClient(context, "mockTrackerName")
 
-        val mockGetDevicePositionResult = mockk<GetDevicePositionResult>()
+        val mockGetDevicePositionResult = mockk<GetDevicePositionResponse>()
         coEvery {
             mockAmazonLocationClient.getDevicePosition(any())
         } returns mockGetDevicePositionResult
 
         runBlocking(Dispatchers.IO) {
-            val result = amazonTrackingHttpClient.getTrackerDeviceLocation(mockAmazonLocationClient)
+            val result = amazonTrackingHttpClient.getTrackerDeviceLocation(locationCredentialProvider)
 
             coEvery {
                 mockAmazonLocationClient.getDevicePosition(
@@ -103,7 +118,8 @@ class LocationUpdateTest {
 
     @Test
     fun `test update Tracker Device single Location`() {
-        val mockAmazonLocationClient = mockk<AmazonLocationClient>()
+        val locationCredentialProvider = mockk<LocationCredentialsProvider>()
+        val mockAmazonLocationClient = mockk<LocationClient>()
         val mockLocation = mockk<Location>()
 
         val mockLocationTime = 123456789L
@@ -111,7 +127,10 @@ class LocationUpdateTest {
         every { mockLocation.latitude } returns 23.455
         every { mockLocation.longitude } returns 103.556
 
-        val mockBatchUpdateDevicePositionResult = mockk<BatchUpdateDevicePositionResult>()
+        val mockBatchUpdateDevicePositionResult = mockk<BatchUpdateDevicePositionResponse>()
+        coEvery {
+            locationCredentialProvider.getLocationClient()
+        } returns mockAmazonLocationClient
         coEvery {
             mockAmazonLocationClient.batchUpdateDevicePosition(any())
         } returns mockBatchUpdateDevicePositionResult
@@ -120,14 +139,14 @@ class LocationUpdateTest {
 
         runBlocking(Dispatchers.Default) {
             val result = amazonTrackingHttpClient.updateTrackerDeviceLocation(
-                mockAmazonLocationClient,
+                locationCredentialProvider,
                 mockLocation
             )
 
             coEvery {
                 mockAmazonLocationClient.batchUpdateDevicePosition(
                     match<BatchUpdateDevicePositionRequest> {
-                        it.updates.size == 1 && it.updates[0].sampleTime.time == mockLocationTime
+                        it.updates.size == 1 && it.updates[0].sampleTime.epochMilliseconds == mockLocationTime
                     }
                 )
             }

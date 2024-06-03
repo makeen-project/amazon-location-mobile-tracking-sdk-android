@@ -6,6 +6,7 @@ import android.location.Location
 import android.os.Build
 import androidx.annotation.RequiresPermission
 import androidx.room.Room
+import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesResponse
 import aws.sdk.kotlin.services.location.model.ResourceNotFoundException
 import aws.smithy.kotlin.runtime.time.epochMilliseconds
 import software.amazon.location.tracking.aws.AmazonTrackingHttpClient
@@ -268,6 +269,33 @@ class LocationTracker {
             }
         } catch (e: ResourceNotFoundException) {
             Logger.log("records not found for given deviceId", e)
+            null
+        }
+    }
+
+    /**
+     * Evaluates a batch of geofences for a given geofence collection name and location.
+     *
+     * This method refreshes the location credentials if necessary and then attempts to evaluate the geofences
+     * using the provided HTTP client. If an exception occurs during the process, it logs the error and returns null.
+     *
+     * @param geofenceCollectionName The name of the geofence collection to evaluate.
+     * @param location The location data used to evaluate the geofences.
+     * @return A `BatchEvaluateGeofencesResponse` containing the results of the evaluation, or null if an error occurs.
+     */
+    suspend fun batchEvaluateGeofences(
+        geofenceCollectionName: String,
+        location: Location
+    ): BatchEvaluateGeofencesResponse? {
+        validateAndRefreshLocationCredentials()
+        return try {
+            httpClient.batchEvaluateGeofences(
+                locationCredentialsProvider,
+                geofenceCollectionName,
+                location
+            )
+        } catch (e: Exception) {
+            Logger.log("batchEvaluateGeofences failed", e)
             null
         }
     }

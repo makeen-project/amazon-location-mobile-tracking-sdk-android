@@ -11,9 +11,8 @@ import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
-import com.amazonaws.services.geo.AmazonLocationClient
-import com.amazonaws.services.geo.model.BatchUpdateDevicePositionResult
+import aws.sdk.kotlin.services.location.LocationClient
+import aws.sdk.kotlin.services.location.model.BatchUpdateDevicePositionResponse
 import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationAvailability
@@ -31,6 +30,9 @@ import io.mockk.mockkConstructor
 import io.mockk.mockkStatic
 import io.mockk.runs
 import io.mockk.unmockkAll
+import java.util.UUID
+import kotlin.concurrent.thread
+import kotlin.test.assertNotNull
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -38,7 +40,12 @@ import org.junit.Test
 import org.mockito.Mock
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import software.amazon.location.auth.AmazonLocationClient
+import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.auth.LocationCredentialsProvider
+import software.amazon.location.auth.utils.Constants
+import software.amazon.location.tracking.TestConstants.IDENTITY_POOL_ID
+import software.amazon.location.tracking.TestConstants.METHOD
 import software.amazon.location.tracking.TestConstants.TEST_CLIENT_CONFIG
 import software.amazon.location.tracking.TestConstants.TEST_IDENTITY_POOL_ID
 import software.amazon.location.tracking.TestConstants.TEST_LATITUDE
@@ -52,9 +59,6 @@ import software.amazon.location.tracking.providers.BackgroundTrackingWorker
 import software.amazon.location.tracking.providers.LocationProvider
 import software.amazon.location.tracking.util.StoreKey
 import software.amazon.location.tracking.util.TrackingSdkLogLevel
-import java.util.UUID
-import kotlin.concurrent.thread
-import kotlin.test.assertNotNull
 
 
 class BackgroundTrackingWorkerTest {
@@ -73,12 +77,21 @@ class BackgroundTrackingWorkerTest {
     @Before
     fun setUp() {
         context = mockk(relaxed = true)
+        every { context.applicationContext } returns mockk()
         workerParameters = mockk<WorkerParameters>(relaxed = true)
-        mockkConstructor(AWSKeyValueStore::class)
-        every { anyConstructed<AWSKeyValueStore>().get("apiKey") } returns "testApiKey"
-        every { anyConstructed<AWSKeyValueStore>().get("region") } returns "us-east-1"
-        every { anyConstructed<AWSKeyValueStore>().put(any(), any<String>()) } just runs
-        every { anyConstructed<AWSKeyValueStore>().clear() } just runs
+        mockkConstructor(LocationClient::class)
+        mockkConstructor(EncryptedSharedPreferences::class)
+        every { anyConstructed<EncryptedSharedPreferences>().get("apiKey") } returns "testApiKey"
+        every { anyConstructed<EncryptedSharedPreferences>().get("region") } returns "us-east-1"
+        every { anyConstructed<EncryptedSharedPreferences>().put(any(), any<String>()) } just runs
+        every { anyConstructed<EncryptedSharedPreferences>().clear() } just runs
+        every { anyConstructed<EncryptedSharedPreferences>().get(Constants.METHOD) } returns "cognito"
+        every { anyConstructed<EncryptedSharedPreferences>().get(Constants.ACCESS_KEY_ID) } returns "test"
+        every { anyConstructed<EncryptedSharedPreferences>().get(Constants.SECRET_KEY) } returns "test"
+        every { anyConstructed<EncryptedSharedPreferences>().get(Constants.SESSION_TOKEN) } returns "test"
+        every { anyConstructed<EncryptedSharedPreferences>().get(Constants.EXPIRATION) } returns "11111"
+        every { anyConstructed<EncryptedSharedPreferences>().get(Constants.IDENTITY_POOL_ID) } returns TEST_IDENTITY_POOL_ID
+        every { anyConstructed<EncryptedSharedPreferences>().initEncryptedSharedPreferences() } just runs
         locationCredentialsProvider = mockk()
         locationClientConfig = LocationTrackerConfig(
             trackerName = TestConstants.TRACKER_NAME,
@@ -103,7 +116,6 @@ class BackgroundTrackingWorkerTest {
         mockkConstructor(RoomDatabase::class)
         mockkConstructor(AmazonLocationClient::class)
         mockkConstructor(LocationCredentialsProvider::class)
-        every { locationCredentialsProvider.getCredentialsProvider() } returns mockk()
         fusedLocationProviderClient = mockk()
         mockkStatic(LocationServices::class)
         every { LocationServices.getFusedLocationProviderClient(context) } returns fusedLocationProviderClient
@@ -153,9 +165,9 @@ class BackgroundTrackingWorkerTest {
         coEvery { anyConstructed<LocationEntryDao_Impl>().insert(any()) } just runs
         coEvery { anyConstructed<LocationEntryDao_Impl>().deleteEntriesByIds(any()) } just runs
         coEvery { anyConstructed<LocationEntryDao_Impl>().deleteEntryById(any()) } just runs
-        val mockBatchUpdateDevicePositionResult = mockk<BatchUpdateDevicePositionResult>()
+        val mockBatchUpdateDevicePositionResult = mockk<BatchUpdateDevicePositionResponse>()
         coEvery {
-            anyConstructed<AmazonLocationClient>().batchUpdateDevicePosition(any())
+            anyConstructed<LocationClient>().batchUpdateDevicePosition(any())
         } returns mockBatchUpdateDevicePositionResult
     }
 
@@ -164,10 +176,10 @@ class BackgroundTrackingWorkerTest {
         val location = mock(Location::class.java)
         `when`(location.latitude).thenReturn(TEST_LATITUDE)
         `when`(location.longitude).thenReturn(TEST_LONGITUDE)
-        every { context.applicationContext } returns mockk()
-        every { anyConstructed<AWSKeyValueStore>().get("method") } returns "cognito"
-        every { anyConstructed<AWSKeyValueStore>().get("identityPoolId") } returns TEST_IDENTITY_POOL_ID
-        every { anyConstructed<AWSKeyValueStore>().get(StoreKey.CLIENT_CONFIG) } returns TEST_CLIENT_CONFIG
+        every { anyConstructed<EncryptedSharedPreferences>().get(METHOD) } returns "cognito"
+        every { anyConstructed<EncryptedSharedPreferences>().get(IDENTITY_POOL_ID) } returns TEST_IDENTITY_POOL_ID
+        every { anyConstructed<EncryptedSharedPreferences>().get(StoreKey.CLIENT_CONFIG) } returns TEST_CLIENT_CONFIG
+        every { anyConstructed<EncryptedSharedPreferences>().contains(StoreKey.DEVICE_ID) } returns true
         runBlocking {
             every { runBlocking { anyConstructed<LocationTracker>().getDeviceLocation(any()) } } returns location
             backgroundTrackingWorker = BackgroundTrackingWorker(context, workerParameters)
