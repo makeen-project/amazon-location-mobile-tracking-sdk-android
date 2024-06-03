@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkConstructor
@@ -20,6 +19,7 @@ import software.amazon.location.tracking.util.StoreKey
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import software.amazon.location.auth.EncryptedSharedPreferences
 
 class BackgroundLocationServiceTest {
 
@@ -29,9 +29,9 @@ class BackgroundLocationServiceTest {
     fun setUp() {
         context = mockk(relaxed = true)
         mockkConstructor(NotificationCompat.Builder::class)
-        mockkConstructor(AWSKeyValueStore::class)
+        mockkConstructor(EncryptedSharedPreferences::class)
         mockkConstructor(Build::class)
-        every { anyConstructed<AWSKeyValueStore>().get(StoreKey.CLIENT_CONFIG) } returns TEST_CLIENT_CONFIG
+        every { anyConstructed<EncryptedSharedPreferences>().get(StoreKey.CLIENT_CONFIG) } returns TEST_CLIENT_CONFIG
     }
 
     @Test

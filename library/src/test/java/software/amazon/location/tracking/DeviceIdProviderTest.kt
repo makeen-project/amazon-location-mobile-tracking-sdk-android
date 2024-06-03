@@ -1,10 +1,11 @@
 package software.amazon.location.tracking
 
 import android.content.Context
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkConstructor
+import io.mockk.runs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -13,7 +14,9 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
+import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.tracking.providers.DeviceIdProvider
+import software.amazon.location.tracking.util.StoreKey
 
 class DeviceIdProviderTest {
 
@@ -25,9 +28,11 @@ class DeviceIdProviderTest {
     @Before
     fun setUp() {
         context = mockk(relaxed = true)
+        mockkConstructor(EncryptedSharedPreferences::class)
+        every { anyConstructed<EncryptedSharedPreferences>().initEncryptedSharedPreferences() } just runs
+        every { anyConstructed<EncryptedSharedPreferences>().get(any()) } returns "mockDeviceID"
+        every { anyConstructed<EncryptedSharedPreferences>().contains(StoreKey.DEVICE_ID) } returns true
         deviceIdProvider = DeviceIdProvider.getInstance(context)
-        mockkConstructor(AWSKeyValueStore::class)
-        every { anyConstructed<AWSKeyValueStore>().get(any()) } returns "mockDeviceID"
     }
 
     @Test
