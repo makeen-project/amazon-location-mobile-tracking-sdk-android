@@ -72,7 +72,7 @@ class LocationUpdateTest {
         runBlocking(Dispatchers.Default) {
             try {
                 amazonTrackingHttpClient.updateTrackerDeviceLocation(
-                    locationCredentialProvider,
+                    mockAmazonLocationClient,
                     arrayOf(mockLocation)
                 )
             } catch (e: Exception) {
@@ -102,7 +102,7 @@ class LocationUpdateTest {
         } returns mockGetDevicePositionResult
 
         runBlocking(Dispatchers.IO) {
-            val result = amazonTrackingHttpClient.getTrackerDeviceLocation(locationCredentialProvider)
+            val result = amazonTrackingHttpClient.getTrackerDeviceLocation(mockAmazonLocationClient)
 
             coEvery {
                 mockAmazonLocationClient.getDevicePosition(
@@ -139,7 +139,7 @@ class LocationUpdateTest {
 
         runBlocking(Dispatchers.Default) {
             val result = amazonTrackingHttpClient.updateTrackerDeviceLocation(
-                locationCredentialProvider,
+                mockAmazonLocationClient,
                 mockLocation
             )
 
