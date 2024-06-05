@@ -257,9 +257,9 @@ class LocationTracker {
         validateAndRefreshLocationCredentials()
         return try {
             val deviceLocation = httpClient.getTrackerDeviceLocation(
-                locationCredentialsProvider,
+                locationCredentialsProvider?.getLocationClient(),
             )
-            deviceLocation?.let {
+            deviceLocation.let {
                 Location("").apply {
                     latitude = it.position[1]
                     longitude = it.position[0]
@@ -290,7 +290,7 @@ class LocationTracker {
         validateAndRefreshLocationCredentials()
         return try {
             httpClient.batchEvaluateGeofences(
-                locationCredentialsProvider,
+                locationCredentialsProvider?.getLocationClient(),
                 geofenceCollectionName,
                 location
             )
@@ -331,7 +331,7 @@ class LocationTracker {
         }.toTypedArray()
 
         val result = httpClient.updateTrackerDeviceLocation(
-            locationCredentialsProvider,
+            locationCredentialsProvider?.getLocationClient(),
             locationsToUpload,
         )
 
