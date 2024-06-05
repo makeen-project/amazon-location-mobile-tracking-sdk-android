@@ -61,7 +61,9 @@ class BackgroundLocationService : Service() {
         locationTrackerConfig = GsonBuilder()
             .registerTypeAdapter(LocationFilter::class.java, LocationFilterAdapter())
             .create().fromJson(
-                EncryptedSharedPreferences(this, PREFS_NAME).get(
+                EncryptedSharedPreferences(this, PREFS_NAME).apply {
+                    initEncryptedSharedPreferences()
+                }.get(
                     StoreKey.CLIENT_CONFIG
                 ) ?: throw Exception("Client config not found"),
                 LocationTrackerConfig::class.java
