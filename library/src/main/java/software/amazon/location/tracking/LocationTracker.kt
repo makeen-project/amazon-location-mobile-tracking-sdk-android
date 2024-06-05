@@ -64,7 +64,9 @@ class LocationTracker {
                 EncryptedSharedPreferences(
                     context,
                     PREFS_NAME
-                ).get(StoreKey.CLIENT_CONFIG) ?: throw Exception("Client config not found"),
+                ).apply {
+                    initEncryptedSharedPreferences()
+                }.get(StoreKey.CLIENT_CONFIG) ?: throw Exception("Client config not found"),
                 LocationTrackerConfig::class.java
             )
     )
