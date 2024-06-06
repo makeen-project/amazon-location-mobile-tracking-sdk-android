@@ -412,7 +412,7 @@ class LocationTracker {
         checkFilterIsExistsAndUpdateValue(filter)
     }
 
-    private fun checkFilterIsExistsAndUpdateValue(filter: LocationFilter) {
+    fun checkFilterIsExistsAndUpdateValue(filter: LocationFilter) {
         val existingFilter = clientConfig.locationFilters.find { it::class == filter::class }
         if (existingFilter != null) {
             when (existingFilter) {
