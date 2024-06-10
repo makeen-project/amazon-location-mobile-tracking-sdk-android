@@ -123,29 +123,17 @@ class AmazonTrackingHttpClient(context: Context, private val mTrackerName: Strin
      * This function evaluates geofences for a given device location using Amazon Location Service.
      *
      * @param locationClient the client used to interact with Amazon Location Service
-     * @param geofenceCollectionName the name of the geofence collection
-     * @param location the location to evaluate
+     * @param batchEvaluateGeofencesRequest the request of batchEvaluateGeofencesRequest
      * @return BatchEvaluateGeofencesResponse containing the result of the evaluation
      */
     suspend fun batchEvaluateGeofences(
         locationClient: LocationClient?,
-        geofenceCollectionName: String,
-        location: Location
+        batchEvaluateGeofencesRequest: BatchEvaluateGeofencesRequest
     ): BatchEvaluateGeofencesResponse {
         if (locationClient == null) throw Exception("Failed to get location client")
-        val deviceID = deviceIdProvider.getDeviceID()
-        val devicePosition = DevicePositionUpdate {
-            this.deviceId = deviceID
-            this.sampleTime = Instant.fromEpochMilliseconds(location.time)
-            this.position = listOf(location.longitude, location.latitude)
-        }
-        val request = BatchEvaluateGeofencesRequest {
-            this.collectionName = geofenceCollectionName
-            this.devicePositionUpdates = listOf(devicePosition)
-        }
         return withContext(Dispatchers.IO) {
             locationClient.batchEvaluateGeofences(
-                request
+                batchEvaluateGeofencesRequest
             )
         }
     }

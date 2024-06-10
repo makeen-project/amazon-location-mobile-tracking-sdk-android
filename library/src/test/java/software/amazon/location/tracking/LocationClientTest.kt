@@ -7,8 +7,10 @@ import android.os.Looper
 import android.util.Log
 import androidx.room.RoomDatabase
 import aws.sdk.kotlin.services.location.LocationClient
+import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesRequest
 import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesResponse
 import aws.sdk.kotlin.services.location.model.BatchUpdateDevicePositionResponse
+import aws.sdk.kotlin.services.location.model.DevicePositionUpdate
 import aws.sdk.kotlin.services.location.model.GetDevicePositionResponse
 import aws.sdk.kotlin.services.location.model.PositionalAccuracy
 import aws.smithy.kotlin.runtime.time.Instant
@@ -48,6 +50,7 @@ import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.tracking.TestConstants.LAST_LOCATION
 import software.amazon.location.tracking.TestConstants.TEST_CLIENT_CONFIG
+import software.amazon.location.tracking.TestConstants.TEST_IDENTITY_POOL_ID
 import software.amazon.location.tracking.TestConstants.TEST_LATITUDE
 import software.amazon.location.tracking.TestConstants.TEST_LONGITUDE
 import software.amazon.location.tracking.TestConstants.TRACKER_NAME
@@ -119,8 +122,7 @@ class LocationClientTest {
         `when`(location.longitude).thenReturn(TEST_LONGITUDE)
         every {
             fusedLocationProviderClient.getCurrentLocation(
-                ofType(CurrentLocationRequest::class),
-                any()
+                ofType(CurrentLocationRequest::class), any()
             )
         } answers {
             Tasks.forResult(location)
@@ -199,8 +201,7 @@ class LocationClientTest {
 
     @Test
     fun `test constructor with tracker name`() {
-        val locationClient =
-            LocationTracker(context, locationCredentialsProvider, TRACKER_NAME)
+        val locationClient = LocationTracker(context, locationCredentialsProvider, TRACKER_NAME)
 
         assertNotNull(locationClient)
     }
@@ -236,9 +237,7 @@ class LocationClientTest {
         val locationResult = LocationResult.create(listOf(location))
         every {
             fusedLocationProviderClient.requestLocationUpdates(
-                any(),
-                ofType(LocationCallback::class),
-                ofType(Looper::class)
+                any(), ofType(LocationCallback::class), ofType(Looper::class)
             )
         } answers {
             val callbackLambda = it.invocation.args[1] as LocationCallback
@@ -284,9 +283,7 @@ class LocationClientTest {
 
         every {
             fusedLocationProviderClient.requestLocationUpdates(
-                any(),
-                ofType(LocationCallback::class),
-                ofType(Looper::class)
+                any(), ofType(LocationCallback::class), ofType(Looper::class)
             )
         } answers {
             val callbackLambda = it.invocation.args[1] as LocationCallback
@@ -320,9 +317,7 @@ class LocationClientTest {
         every { fusedLocationProviderClient.locationAvailability } returns task
         every {
             fusedLocationProviderClient.requestLocationUpdates(
-                any(),
-                ofType(LocationCallback::class),
-                ofType(Looper::class)
+                any(), ofType(LocationCallback::class), ofType(Looper::class)
             )
         } returns mockk()
         locationClient.startBackgroundLocationUpdates()
@@ -330,8 +325,7 @@ class LocationClientTest {
 
         verify {
             anyConstructed<EncryptedSharedPreferences>().put(
-                StoreKey.BG_TRACKING_IN_PROGRESS,
-                false.toString()
+                StoreKey.BG_TRACKING_IN_PROGRESS, false.toString()
             )
         }
     }
@@ -365,7 +359,24 @@ class LocationClientTest {
         val locationClient =
             LocationTracker(context, locationCredentialsProvider, locationClientConfig)
         runBlocking {
-            val location = locationClient.batchEvaluateGeofences("test", Location(""))
+            val map: HashMap<String, String> = HashMap()
+            TEST_IDENTITY_POOL_ID.split(":").let { splitStringList ->
+                splitStringList[0].let { region ->
+                    map["region"] = region
+                }
+                splitStringList[1].let { id ->
+                    map["id"] = id
+                }
+            }
+            val location = locationClient.batchEvaluateGeofences(BatchEvaluateGeofencesRequest {
+                collectionName = "test"
+                devicePositionUpdates = listOf(DevicePositionUpdate {
+                    position = listOf(27.588445, 23.55954)
+                    deviceId = "test"
+                    sampleTime = Instant.now()
+                    positionProperties = map
+                })
+            })
             assertNotNull(location)
         }
     }
@@ -470,8 +481,7 @@ class LocationClientTest {
             locationClient.enableFilter(AccuracyLocationFilter())
             verify {
                 anyConstructed<EncryptedSharedPreferences>().put(
-                    StoreKey.IS_ACCURACY_FILTER_ENABLE,
-                    true.toString()
+                    StoreKey.IS_ACCURACY_FILTER_ENABLE, true.toString()
                 )
             }
         }
@@ -487,8 +497,7 @@ class LocationClientTest {
             locationClient.disableFilter(AccuracyLocationFilter())
             verify {
                 anyConstructed<EncryptedSharedPreferences>().put(
-                    StoreKey.IS_ACCURACY_FILTER_ENABLE,
-                    false.toString()
+                    StoreKey.IS_ACCURACY_FILTER_ENABLE, false.toString()
                 )
             }
         }
@@ -512,8 +521,7 @@ class LocationClientTest {
         every { BackgroundTrackingWorker.enqueueWork(context) } just runs
 
         locationClient.startBackground(
-            BackgroundTrackingMode.BATTERY_SAVER_TRACKING,
-            serviceCallback
+            BackgroundTrackingMode.BATTERY_SAVER_TRACKING, serviceCallback
         )
         verify { BackgroundTrackingWorker.enqueueWork(context) }
     }
