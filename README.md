@@ -9,8 +9,8 @@ This tracking SDK works with the overall AWS SDK and the Amazon Location Authent
 Add the following lines to the dependencies section of your build.gradle file in Android Studio:
 
 ``` gradle
-implementation("software.amazon.location:tracking:0.0.1")
-implementation("software.amazon.location:auth:0.0.1")
+implementation("software.amazon.location:tracking:0.0.2")
+implementation("software.amazon.location:auth:0.0.2")
 implementation("com.amazonaws:aws-android-sdk-location:2.72.0")
 ```
 
