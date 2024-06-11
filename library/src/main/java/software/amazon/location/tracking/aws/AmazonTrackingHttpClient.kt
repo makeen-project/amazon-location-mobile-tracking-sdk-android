@@ -15,6 +15,7 @@ import aws.smithy.kotlin.runtime.time.fromEpochMilliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import software.amazon.location.tracking.config.SdkConfig.MAX_RETRY
+import software.amazon.location.tracking.database.LocationEntry
 import software.amazon.location.tracking.providers.DeviceIdProvider
 import software.amazon.location.tracking.util.Logger
 
@@ -118,22 +119,57 @@ class AmazonTrackingHttpClient(context: Context, private val mTrackerName: Strin
     }
 
     /**
-     * Evaluates geofences for a given location.
+     * Evaluates geofences for a given device location.
      *
-     * This function evaluates geofences for a given device location using Amazon Location Service.
+     * This function evaluates geofences for a given list of device locations using Amazon Location Service.
      *
      * @param locationClient the client used to interact with Amazon Location Service
-     * @param batchEvaluateGeofencesRequest the request of batchEvaluateGeofencesRequest
+     * @param locationEntry the list of LocationEntry objects representing the device locations to evaluate
+     * @param mDeviceId the ID of the device being evaluated
+     * @param identityId the identity ID, formatted as "region:id", used for position properties
+     * @param geofenceCollectionName the name of the geofence collection to evaluate against
      * @return BatchEvaluateGeofencesResponse containing the result of the evaluation
+     * @throws Exception if the location client is null
      */
     suspend fun batchEvaluateGeofences(
         locationClient: LocationClient?,
-        batchEvaluateGeofencesRequest: BatchEvaluateGeofencesRequest
+        locationEntry: List<LocationEntry>,
+        mDeviceId: String,
+        identityId: String,
+        geofenceCollectionName: String
     ): BatchEvaluateGeofencesResponse {
         if (locationClient == null) throw Exception("Failed to get location client")
+        val map: HashMap<String, String> = HashMap()
+        identityId.split(":").let { splitStringList ->
+            splitStringList[0].let { region ->
+                map["region"] = region
+            }
+            splitStringList[1].let { id ->
+                map["id"] = id
+            }
+        }
+        val devicePositionUpdateList = arrayListOf<DevicePositionUpdate>()
+
+        locationEntry.forEach {
+            val devicePositionUpdate =
+                DevicePositionUpdate {
+                    position = listOf(it.longitude, it.latitude)
+                    deviceId = mDeviceId
+                    sampleTime = Instant.now()
+                    positionProperties = map
+                }
+
+            devicePositionUpdateList.add(devicePositionUpdate)
+        }
+
+        val request =
+            BatchEvaluateGeofencesRequest {
+                collectionName = geofenceCollectionName
+                devicePositionUpdates = devicePositionUpdateList
+            }
         return withContext(Dispatchers.IO) {
             locationClient.batchEvaluateGeofences(
-                batchEvaluateGeofencesRequest
+                request
             )
         }
     }

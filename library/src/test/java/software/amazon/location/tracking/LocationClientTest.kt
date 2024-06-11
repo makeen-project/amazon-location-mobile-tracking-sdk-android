@@ -359,24 +359,20 @@ class LocationClientTest {
         val locationClient =
             LocationTracker(context, locationCredentialsProvider, locationClientConfig)
         runBlocking {
-            val map: HashMap<String, String> = HashMap()
-            TEST_IDENTITY_POOL_ID.split(":").let { splitStringList ->
-                splitStringList[0].let { region ->
-                    map["region"] = region
-                }
-                splitStringList[1].let { id ->
-                    map["id"] = id
-                }
-            }
-            val location = locationClient.batchEvaluateGeofences(BatchEvaluateGeofencesRequest {
-                collectionName = "test"
-                devicePositionUpdates = listOf(DevicePositionUpdate {
-                    position = listOf(27.588445, 23.55954)
-                    deviceId = "test"
-                    sampleTime = Instant.now()
-                    positionProperties = map
-                })
-            })
+            val location = locationClient.batchEvaluateGeofences(
+                listOf(
+                    LocationEntry(
+                        id = 11,
+                        latitude = 23.55555,
+                        longitude = 27.3333,
+                        time = 5444541584584,
+                        accuracy = 12.0F
+                    )
+                ),
+                "testDeviceId",
+                TEST_IDENTITY_POOL_ID,
+                "test-collection"
+            )
             assertNotNull(location)
         }
     }

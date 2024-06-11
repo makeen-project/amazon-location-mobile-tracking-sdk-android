@@ -282,17 +282,27 @@ class LocationTracker {
      * This method refreshes the location credentials if necessary and then attempts to evaluate the geofences
      * using the provided HTTP client. If an exception occurs during the process, it logs the error and returns null.
      *
-     * @param evaluateGeofencesRequest the list of device position updates.
-     * @return A `BatchEvaluateGeofencesResponse` containing the results of the evaluation, or null if an error occurs.
+     * @param locationEntry the list of LocationEntry objects representing the device positions to evaluate
+     * @param deviceId the ID of the device being evaluated
+     * @param identityId the identity ID, formatted as "region:id", used for position properties
+     * @param geofenceCollectionName the name of the geofence collection to evaluate against
+     * @return A `BatchEvaluateGeofencesResponse` containing the results of the evaluation, or null if an error occurs
+     * @throws Exception if there is an error during the evaluation process
      */
     suspend fun batchEvaluateGeofences(
-        evaluateGeofencesRequest: BatchEvaluateGeofencesRequest
+        locationEntry: List<LocationEntry>,
+        deviceId: String,
+        identityId: String,
+        geofenceCollectionName: String
     ): BatchEvaluateGeofencesResponse? {
         validateAndRefreshLocationCredentials()
         return try {
             httpClient.batchEvaluateGeofences(
                 locationCredentialsProvider?.getLocationClient(),
-                evaluateGeofencesRequest
+                locationEntry,
+                deviceId,
+                identityId,
+                geofenceCollectionName
             )
         } catch (e: Exception) {
             Logger.log("batchEvaluateGeofences failed", e)
