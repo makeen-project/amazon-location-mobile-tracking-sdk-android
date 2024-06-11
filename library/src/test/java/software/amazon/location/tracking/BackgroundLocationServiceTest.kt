@@ -6,8 +6,10 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkConstructor
+import io.mockk.runs
 import io.mockk.unmockkAll
 import org.junit.After
 import org.junit.Before
@@ -32,6 +34,7 @@ class BackgroundLocationServiceTest {
         mockkConstructor(EncryptedSharedPreferences::class)
         mockkConstructor(Build::class)
         every { anyConstructed<EncryptedSharedPreferences>().get(StoreKey.CLIENT_CONFIG) } returns TEST_CLIENT_CONFIG
+        every { anyConstructed<EncryptedSharedPreferences>().initEncryptedSharedPreferences() } just runs
     }
 
     @Test

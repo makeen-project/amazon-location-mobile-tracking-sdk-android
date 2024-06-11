@@ -6,6 +6,7 @@ import android.location.Location
 import android.os.Build
 import androidx.annotation.RequiresPermission
 import androidx.room.Room
+import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesRequest
 import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesResponse
 import aws.sdk.kotlin.services.location.model.ResourceNotFoundException
 import aws.smithy.kotlin.runtime.time.epochMilliseconds
@@ -281,20 +282,27 @@ class LocationTracker {
      * This method refreshes the location credentials if necessary and then attempts to evaluate the geofences
      * using the provided HTTP client. If an exception occurs during the process, it logs the error and returns null.
      *
-     * @param geofenceCollectionName The name of the geofence collection to evaluate.
-     * @param location The location data used to evaluate the geofences.
-     * @return A `BatchEvaluateGeofencesResponse` containing the results of the evaluation, or null if an error occurs.
+     * @param locationEntry the list of LocationEntry objects representing the device positions to evaluate
+     * @param deviceId the ID of the device being evaluated
+     * @param identityId the identity ID, formatted as "region:id", used for position properties
+     * @param geofenceCollectionName the name of the geofence collection to evaluate against
+     * @return A `BatchEvaluateGeofencesResponse` containing the results of the evaluation, or null if an error occurs
+     * @throws Exception if there is an error during the evaluation process
      */
     suspend fun batchEvaluateGeofences(
-        geofenceCollectionName: String,
-        location: Location
+        locationEntry: List<LocationEntry>,
+        deviceId: String,
+        identityId: String,
+        geofenceCollectionName: String
     ): BatchEvaluateGeofencesResponse? {
         validateAndRefreshLocationCredentials()
         return try {
             httpClient.batchEvaluateGeofences(
                 locationCredentialsProvider?.getLocationClient(),
-                geofenceCollectionName,
-                location
+                locationEntry,
+                deviceId,
+                identityId,
+                geofenceCollectionName
             )
         } catch (e: Exception) {
             Logger.log("batchEvaluateGeofences failed", e)
