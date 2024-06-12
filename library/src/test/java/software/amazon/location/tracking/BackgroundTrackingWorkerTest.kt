@@ -40,7 +40,6 @@ import org.junit.Test
 import org.mockito.Mock
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
-import software.amazon.location.auth.AmazonLocationClient
 import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.auth.utils.Constants
@@ -114,7 +113,6 @@ class BackgroundTrackingWorkerTest {
         mockkConstructor(AmazonTrackingHttpClient::class)
         mockkConstructor(LocationProvider::class)
         mockkConstructor(RoomDatabase::class)
-        mockkConstructor(AmazonLocationClient::class)
         mockkConstructor(LocationCredentialsProvider::class)
         fusedLocationProviderClient = mockk()
         mockkStatic(LocationServices::class)
