@@ -178,7 +178,11 @@ class BackgroundLocationService : Service() {
     private fun stopService() {
         serviceCallback?.serviceStopped()
         locationTracker?.stopBackgroundLocationUpdates()
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            stopForeground(true)
+        }
         stopSelf()
         isRunning = false
     }

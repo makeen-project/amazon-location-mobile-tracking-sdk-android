@@ -10,7 +10,7 @@ Check the latest version of [auth SDK](https://mvnrepository.com/artifact/softwa
 Add the following lines to the dependencies section of your build.gradle file in Android Studio:
 
 ``` gradle
-implementation("software.amazon.location:tracking:0.0.1")
+implementation("software.amazon.location:tracking:0.0.2")
 implementation("software.amazon.location:auth:0.0.2")
 implementation("aws.sdk.kotlin:location:1.2.21")
 ```
