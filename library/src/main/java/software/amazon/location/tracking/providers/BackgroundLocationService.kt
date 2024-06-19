@@ -14,7 +14,6 @@ import android.os.IBinder
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
 import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.R
 import software.amazon.location.auth.LocationCredentialsProvider
@@ -26,6 +25,7 @@ import software.amazon.location.tracking.util.StoreKey
 import com.google.android.gms.location.Priority
 import com.google.gson.GsonBuilder
 import java.util.concurrent.TimeUnit
+import software.amazon.location.auth.EncryptedSharedPreferences
 
 private const val SERVICE_STOP_ACTION: String = "STOP_SERVICE_ACTION"
 private const val REQUEST_CODE_NOTIFICATION = 0
@@ -61,11 +61,11 @@ class BackgroundLocationService : Service() {
         locationTrackerConfig = GsonBuilder()
             .registerTypeAdapter(LocationFilter::class.java, LocationFilterAdapter())
             .create().fromJson(
-                AWSKeyValueStore(
-                    this,
-                    PREFS_NAME,
-                    true
-                ).get(StoreKey.CLIENT_CONFIG) ?: throw Exception("Client config not found"),
+                EncryptedSharedPreferences(this, PREFS_NAME).apply {
+                    initEncryptedSharedPreferences()
+                }.get(
+                    StoreKey.CLIENT_CONFIG
+                ) ?: throw Exception("Client config not found"),
                 LocationTrackerConfig::class.java
             )
         locationTrackerConfig?.persistentNotificationConfig?.notificationId?.let {

@@ -4,14 +4,15 @@ These utilities help you when making [Amazon Location Service](https://aws.amazo
 
 ## Installation
 
-This tracking SDK works with the overall AWS SDK and the Amazon Location Authenticaion SDK. All SDKs are published to Maven Central.
+This tracking SDK works with the overall AWS SDK and the Amazon Location Authentication SDK. All SDKs are published to Maven Central. 
+Check the latest version of [auth SDK](https://mvnrepository.com/artifact/software.amazon.location/auth) and [tracking SDK](https://mvnrepository.com/artifact/software.amazon.location/tracking) on Maven Central.
 
 Add the following lines to the dependencies section of your build.gradle file in Android Studio:
 
 ``` gradle
 implementation("software.amazon.location:tracking:0.0.2")
 implementation("software.amazon.location:auth:0.0.2")
-implementation("com.amazonaws:aws-android-sdk-location:2.72.0")
+implementation("aws.sdk.kotlin:location:1.2.21")
 ```
 
 ## Functions
@@ -71,7 +72,8 @@ LocationTrackerConfig(
     var frequency: Long = 1500,
     var waitForAccurateLocation: Boolean = false,
     var minUpdateIntervalMillis: Long = 1000,
-    var persistentNotificationConfig: NotificationConfig = NotificationConfig())
+    var persistentNotificationConfig: NotificationConfig = NotificationConfig()
+)
 </td><td>This initializes the LocationTrackerConfig with user-defined parameter values. If a parameter value is not provided, it will be set to a default value</td></tr>
 
 <tr><td>LocationFilter</td><td>shouldUpload(currentLocation: LocationEntry, previousLocation: LocationEntry?): Boolean</td><td>The LocationFilter is a protocol that users can implement for their custom filter implementation. A user would need to implement `shouldUpload` function to compare previous and current location and return if the current location should be uploaded</td></tr>
@@ -103,7 +105,7 @@ import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.config.LocationTrackerConfig
 import software.amazon.location.tracking.util.TrackingSdkLogLevel
 
-import com.amazonaws.services.geo.AmazonLocationClient
+import aws.sdk.kotlin.services.location.LocationClient
 
 import software.amazon.location.auth.AuthHelper
 import software.amazon.location.auth.LocationCredentialsProvider
@@ -114,8 +116,8 @@ Create an `AuthHelper` as we need `LocationCredentialsProvider` for creating `Lo
 ``` kotlin
 // Create an authentication helper using credentials from Cognito
 private fun exampleCognitoLogin() {
-        val authHelper = AuthHelper(applicationContext)
-        val locationCredentialsProvider : LocationCredentialsProvider = authHelper.authenticateWithCognitoIdentityPool("My-Cognito-Identity-Pool-Id")
+    val authHelper = AuthHelper(applicationContext)
+    val locationCredentialsProvider : LocationCredentialsProvider = authHelper.authenticateWithCognitoIdentityPool("My-Cognito-Identity-Pool-Id")
 }
 ```
 
