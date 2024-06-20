@@ -11,7 +11,7 @@ mavenPublishing {
     publishToMavenCentral(SonatypeHost.DEFAULT, automaticRelease = true)
     signAllPublications()
 
-    coordinates("software.amazon.location", "tracking", "0.0.2")
+    coordinates("software.amazon.location", "tracking", "0.2.4")
 
     pom {
         name.set("My Library")
@@ -87,7 +87,7 @@ dependencies {
     if (findProject(":authSdk") != null) {
         implementation(project(":authSdk"))
     } else {
-        implementation("software.amazon.location:auth:0.0.2")
+        implementation("software.amazon.location:auth:0.2.4")
     }
 
     val roomVersion = "2.6.1"
