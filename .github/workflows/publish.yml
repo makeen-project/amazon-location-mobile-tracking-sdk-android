@@ -26,9 +26,9 @@ jobs:
       
       - name: Publish to Maven Central
         env:
-          ORG_GRADLE_PROJECT_AuthSDKUsername: ${{ secrets.SONATYPE_ACCOUNT_USERNAME }}
-          ORG_GRADLE_PROJECT_AuthSDKPassword: ${{ secrets.SONATYPE_ACCOUNT_PASSWORD }}
+          ORG_GRADLE_PROJECT_TrackingSDKUsername: ${{ secrets.SONATYPE_ACCOUNT_USERNAME }}
+          ORG_GRADLE_PROJECT_TrackingSDKPassword: ${{ secrets.SONATYPE_ACCOUNT_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SONATYPE_ACCOUNT_GPG_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SONATYPE_ACCOUNT_GPG_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SONATYPE_ACCOUNT_GPG_KEY_PASSWORD }}
-        run: ./gradlew publishAllPublicationsToAuthSDKRepository
+        run: ./gradlew publishAllPublicationsToTrackingSDKRepository
