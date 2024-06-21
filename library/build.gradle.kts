@@ -7,17 +7,27 @@ plugins {
     id("com.vanniktech.maven.publish") version "0.27.0"
 }
 
+publishing {
+    repositories {
+        maven {
+            name = "TrackingSDK"
+            url = uri("https://aws.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            credentials(PasswordCredentials::class)
+        }
+    }
+}
+
 mavenPublishing {
     publishToMavenCentral(SonatypeHost.DEFAULT, automaticRelease = true)
     signAllPublications()
 
-    coordinates("software.amazon.location", "tracking", "0.0.2")
+    coordinates("software.amazon.location", "tracking", "0.2.4")
 
     pom {
-        name.set("My Library")
-        description.set("A description of what my library does.")
-        inceptionYear.set("2020")
-        url.set("https://github.com/username/mylibrary/")
+        name.set("Amazon Location Service Mobile Tracking SDK for Android")
+        description.set("These utilities help you when making Amazon Location Service API calls from your Android applications. This library uses the AWS SDK to call tracking APIs.")
+        inceptionYear.set("2024")
+        url.set("https://github.com/aws-geospatial/amazon-location-mobile-tracking-sdk-android")
         licenses {
             license {
                 name.set("The Apache License, Version 2.0")
@@ -27,15 +37,15 @@ mavenPublishing {
         }
         developers {
             developer {
-                id.set("username")
-                name.set("User Name")
-                url.set("https://github.com/username/")
+                id.set("aws-geospatial")
+                name.set("AWS Geospatial")
+                url.set("https://github.com/aws-geospatial")
             }
         }
         scm {
-            url.set("https://github.com/username/mylibrary/")
-            connection.set("scm:git:git://github.com/username/mylibrary.git")
-            developerConnection.set("scm:git:ssh://git@github.com/username/mylibrary.git")
+            url.set("https://github.com/aws-geospatial/amazon-location-mobile-tracking-sdk-android")
+            connection.set("scm:git:git://github.com/aws-geospatial/amazon-location-mobile-tracking-sdk-android")
+            developerConnection.set("scm:git:ssh://git@github.com/aws-geospatial/amazon-location-mobile-tracking-sdk-android")
         }
     }
 }
@@ -87,7 +97,7 @@ dependencies {
     if (findProject(":authSdk") != null) {
         implementation(project(":authSdk"))
     } else {
-        implementation("software.amazon.location:auth:0.0.2")
+        implementation("software.amazon.location:auth:0.2.4")
     }
 
     val roomVersion = "2.6.1"
