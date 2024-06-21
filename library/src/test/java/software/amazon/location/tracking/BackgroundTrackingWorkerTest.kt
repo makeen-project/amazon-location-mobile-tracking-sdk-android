@@ -80,7 +80,6 @@ class BackgroundTrackingWorkerTest {
         workerParameters = mockk<WorkerParameters>(relaxed = true)
         mockkConstructor(LocationClient::class)
         mockkConstructor(EncryptedSharedPreferences::class)
-        every { anyConstructed<EncryptedSharedPreferences>().get("apiKey") } returns "testApiKey"
         every { anyConstructed<EncryptedSharedPreferences>().get("region") } returns "us-east-1"
         every { anyConstructed<EncryptedSharedPreferences>().put(any(), any<String>()) } just runs
         every { anyConstructed<EncryptedSharedPreferences>().clear() } just runs
@@ -214,7 +213,7 @@ class BackgroundTrackingWorkerTest {
     fun isWorkRunning() {
         mockkStatic(WorkManager::class)
         val mockWorkInfoList = listOf(
-            createWorkInfo(WorkInfo.State.RUNNING),
+            createWorkInfo(),
         )
         every { WorkManager.getInstance(context).getWorkInfosByTag(any()).get() } returns mockWorkInfoList
 
@@ -224,11 +223,11 @@ class BackgroundTrackingWorkerTest {
         }
     }
 
-    private fun createWorkInfo(state: WorkInfo.State): WorkInfo {
+    private fun createWorkInfo(): WorkInfo {
         val id = UUID.randomUUID()
         return WorkInfo(
             id = id,
-            state = state,
+            state = WorkInfo.State.RUNNING,
             tags = emptySet(),
             outputData = Data.EMPTY,
             progress = Data.EMPTY,
