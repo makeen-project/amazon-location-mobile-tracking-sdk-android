@@ -56,6 +56,7 @@ import software.amazon.location.tracking.database.LocationEntryDao_Impl
 import software.amazon.location.tracking.filters.TimeLocationFilter
 import software.amazon.location.tracking.providers.BackgroundTrackingWorker
 import software.amazon.location.tracking.providers.LocationProvider
+import software.amazon.location.tracking.util.Helper
 import software.amazon.location.tracking.util.StoreKey
 import software.amazon.location.tracking.util.TrackingSdkLogLevel
 
@@ -79,6 +80,8 @@ class BackgroundTrackingWorkerTest {
         every { context.applicationContext } returns mockk()
         workerParameters = mockk<WorkerParameters>(relaxed = true)
         mockkConstructor(LocationClient::class)
+        mockkConstructor(Helper::class)
+        every { anyConstructed<Helper>().isGooglePlayServicesAvailable(any()) } returns true
         mockkConstructor(EncryptedSharedPreferences::class)
         every { anyConstructed<EncryptedSharedPreferences>().get("region") } returns "us-east-1"
         every { anyConstructed<EncryptedSharedPreferences>().put(any(), any<String>()) } just runs
