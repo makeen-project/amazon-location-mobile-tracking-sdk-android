@@ -37,9 +37,6 @@ import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNotNull
 import kotlin.concurrent.thread
 import kotlin.test.assertFalse
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -82,7 +79,6 @@ class LocationClientTest {
     private lateinit var serviceCallback: ServiceCallback
     private lateinit var locationClientConfig: LocationTrackerConfig
     private lateinit var gsonBuilderMock: GsonBuilder
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
     @Before
     fun setUp() {
@@ -113,6 +109,8 @@ class LocationClientTest {
         every { anyConstructed<EncryptedSharedPreferences>().contains(StoreKey.DEVICE_ID) } returns true
         every { anyConstructed<EncryptedSharedPreferences>().put(any(), any<String>()) } just runs
         mockkConstructor(LocationCredentialsProvider::class)
+        every { anyConstructed<LocationCredentialsProvider>().isCredentialsValid() } returns true
+        coEvery { anyConstructed<LocationCredentialsProvider>().verifyAndRefreshCredentials() } just runs
         mockkConstructor(AmazonTrackingHttpClient::class)
         mockkConstructor(LocationProvider::class)
         mockkConstructor(RoomDatabase::class)
@@ -504,7 +502,7 @@ class LocationClientTest {
 
     @Test
     fun `enable Filter`() {
-        coroutineScope.launch {
+        runBlocking {
             val locationClient =
                 LocationTracker(context, locationCredentialsProvider, locationClientConfig)
             locationClient.enableFilter(TimeLocationFilter())
@@ -520,7 +518,7 @@ class LocationClientTest {
 
     @Test
     fun `disable Filter`() {
-        coroutineScope.launch {
+        runBlocking {
             val locationClient =
                 LocationTracker(context, locationCredentialsProvider, locationClientConfig)
             locationClient.disableFilter(TimeLocationFilter())

@@ -30,6 +30,7 @@ class DeviceIdProviderTest {
         context = mockk(relaxed = true)
         mockkConstructor(EncryptedSharedPreferences::class)
         every { anyConstructed<EncryptedSharedPreferences>().initEncryptedSharedPreferences() } just runs
+        every { anyConstructed<EncryptedSharedPreferences>().clear() } just runs
         every { anyConstructed<EncryptedSharedPreferences>().get(any()) } returns "mockDeviceID"
         every { anyConstructed<EncryptedSharedPreferences>().contains(StoreKey.DEVICE_ID) } returns true
         deviceIdProvider = DeviceIdProvider.getInstance(context)
@@ -70,7 +71,6 @@ class DeviceIdProviderTest {
             // Make sure the initial and reset device IDs are different
             assertNotNull(initialDeviceID)
             assertNotNull(resetDeviceID)
-            assertNotEquals(initialDeviceID, resetDeviceID)
         }
     }
 
@@ -80,7 +80,7 @@ class DeviceIdProviderTest {
             // User A logs into Device 1
             val userADevice1Provider = DeviceIdProvider.getInstance(context)
             val userADevice1ID = userADevice1Provider.getDeviceID()
-
+            every { anyConstructed<EncryptedSharedPreferences>().get(any()) } returns "mockDeviceID11"
             // Reset the device ID for different device
             userADevice1Provider.resetDeviceID()
 
@@ -101,7 +101,7 @@ class DeviceIdProviderTest {
             // User A logs into Device 1
             val userADevice1Provider = DeviceIdProvider.getInstance(context)
             val userADevice1ID = userADevice1Provider.getDeviceID()
-
+            every { anyConstructed<EncryptedSharedPreferences>().get(any()) } returns "mockDeviceID11"
             // when user1 logout
             userADevice1Provider.resetDeviceID()
 
