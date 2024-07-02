@@ -4,7 +4,7 @@ These utilities help you when making [Amazon Location Service](https://aws.amazo
 
 ## Installation
 
-This tracking SDK works with the overall AWS SDK and the Amazon Location Authentication SDK. All SDKs are published to Maven Central. 
+This tracking SDK works with the overall AWS SDK and the Amazon Location Authentication SDK. All SDKs are published to Maven Central.
 Check the latest version of [auth SDK](https://mvnrepository.com/artifact/software.amazon.location/auth) and [tracking SDK](https://mvnrepository.com/artifact/software.amazon.location/tracking) on Maven Central.
 
 Add the following lines to the dependencies section of your build.gradle file in Android Studio:
@@ -118,6 +118,14 @@ Create an `AuthHelper` as we need `LocationCredentialsProvider` for creating `Lo
 private fun exampleCognitoLogin() {
     val authHelper = AuthHelper(applicationContext)
     val locationCredentialsProvider : LocationCredentialsProvider = authHelper.authenticateWithCognitoIdentityPool("My-Cognito-Identity-Pool-Id")
+}
+
+OR
+
+// Create a credentail provider using custom credential provider with AuthHelper
+private fun exampleCustomCredentialLogin() {
+    var authHelper = AuthHelper(applicationContext)
+    var locationCredentialsProvider : LocationCredentialsProvider = authHelper.authenticateWithCredentialsProvider("MY-AWS-REGION", "MY-CUSTOM-CREDENTIAL-PROVIDER")
 }
 ```
 
