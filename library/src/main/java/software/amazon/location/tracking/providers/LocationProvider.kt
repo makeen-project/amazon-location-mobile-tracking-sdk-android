@@ -113,15 +113,15 @@ class LocationProvider(
         locationListener?.let {
             when (locationTrackerConfig.accuracy) {
                 Priority.PRIORITY_HIGH_ACCURACY -> {
-                    locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, frequency, MIN_DISTANCE, it, Looper.getMainLooper(),)
+                    locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, frequency, MIN_DISTANCE, it, Looper.getMainLooper())
                 }
 
                 Priority.PRIORITY_BALANCED_POWER_ACCURACY, Priority.PRIORITY_LOW_POWER -> {
-                    locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, frequency, MIN_DISTANCE, it, Looper.getMainLooper(),)
+                    locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, frequency, MIN_DISTANCE, it, Looper.getMainLooper())
                 }
 
                 else -> {
-                    locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, frequency, MIN_DISTANCE, it, Looper.getMainLooper(),)
+                    locationManager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, frequency, MIN_DISTANCE, it, Looper.getMainLooper())
                 }
             }
         }
