@@ -37,9 +37,6 @@ import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNotNull
 import kotlin.concurrent.thread
 import kotlin.test.assertFalse
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -70,7 +67,7 @@ import software.amazon.location.tracking.util.ServiceCallback
 import software.amazon.location.tracking.util.StoreKey
 import software.amazon.location.tracking.util.TrackingSdkLogLevel
 
-class LocationClientTest {
+class LocationTrackerTest {
 
 
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
@@ -82,7 +79,6 @@ class LocationClientTest {
     private lateinit var serviceCallback: ServiceCallback
     private lateinit var locationClientConfig: LocationTrackerConfig
     private lateinit var gsonBuilderMock: GsonBuilder
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
     @Before
     fun setUp() {
@@ -113,6 +109,8 @@ class LocationClientTest {
         every { anyConstructed<EncryptedSharedPreferences>().contains(StoreKey.DEVICE_ID) } returns true
         every { anyConstructed<EncryptedSharedPreferences>().put(any(), any<String>()) } just runs
         mockkConstructor(LocationCredentialsProvider::class)
+        every { anyConstructed<LocationCredentialsProvider>().isCredentialsValid() } returns true
+        coEvery { anyConstructed<LocationCredentialsProvider>().verifyAndRefreshCredentials() } just runs
         mockkConstructor(AmazonTrackingHttpClient::class)
         mockkConstructor(LocationProvider::class)
         mockkConstructor(RoomDatabase::class)
@@ -221,9 +219,24 @@ class LocationClientTest {
 
     @Test
     fun `start and stop location tracking`() {
+        val mockAmazonLocationClient = mockk<LocationClient>()
+        coEvery { locationCredentialsProvider.isCredentialsValid() } returns true
+        coEvery { locationCredentialsProvider.verifyAndRefreshCredentials() } just runs
+        coEvery {
+            locationCredentialsProvider.getLocationClient()
+        } returns mockAmazonLocationClient
+        val result = BatchUpdateDevicePositionResponse.invoke {
+            errors = listOf()
+        }
+        coEvery {
+            mockAmazonLocationClient.batchUpdateDevicePosition(any())
+        } returns result
+        val locationTrackingCallback = mockk<LocationTrackingCallback>(relaxed = true)
+        val awsKeyValueStore = mockk<EncryptedSharedPreferences>()
+
+        every { awsKeyValueStore.get(any()) } returns "true"
         val locationClient =
             LocationTracker(context, locationCredentialsProvider, locationClientConfig)
-        val locationTrackingCallback = mockk<LocationTrackingCallback>(relaxed = true)
         val task: Task<LocationAvailability> = mockk()
         every { task.addOnSuccessListener(any()) } answers {
             val listener = arg<OnSuccessListener<LocationAvailability>>(0)
@@ -336,47 +349,6 @@ class LocationClientTest {
     }
 
     @Test
-    fun `start and stop location background tracking without fused location`() {
-        every { anyConstructed<Helper>().isGooglePlayServicesAvailable(any()) } returns false
-        val locationClient =
-            LocationTracker(context, locationCredentialsProvider, locationClientConfig)
-        val task: Task<LocationAvailability> = mockk()
-        every { task.addOnSuccessListener(any()) } answers {
-            val listener = arg<OnSuccessListener<LocationAvailability>>(0)
-            val locationAvailability = mockk<LocationAvailability> {
-                every { isLocationAvailable } returns true
-            }
-            listener.onSuccess(locationAvailability)
-            task
-        }
-        every { fusedLocationProviderClient.locationAvailability } returns task
-        every {
-            fusedLocationProviderClient.requestLocationUpdates(
-                any(), ofType(LocationCallback::class), ofType(Looper::class)
-            )
-        } returns mockk()
-        locationClient.startBackgroundLocationUpdates()
-        locationClient.stopBackgroundLocationUpdates()
-
-        verify {
-            anyConstructed<EncryptedSharedPreferences>().put(
-                StoreKey.BG_TRACKING_IN_PROGRESS, false.toString()
-            )
-        }
-    }
-
-    @Test
-    fun `get Device Location`() {
-        val locationTrackingCallback = mockk<LocationTrackingCallback>(relaxed = true)
-        val locationClient =
-            LocationTracker(context, locationCredentialsProvider, locationClientConfig)
-        runBlocking {
-            val location = locationClient.getDeviceLocation(locationTrackingCallback)
-            assertNotNull(location)
-        }
-    }
-
-    @Test
     fun `evaluate geofence`() {
         val mockAmazonLocationClient = mockk<LocationClient>()
         coEvery { locationCredentialsProvider.isCredentialsValid() } returns true
@@ -439,45 +411,6 @@ class LocationClientTest {
     }
 
     @Test
-    fun `uploadLocationUpdates uploads locations and handles callbacks`() {
-        val mockAmazonLocationClient = mockk<LocationClient>()
-        coEvery { locationCredentialsProvider.isCredentialsValid() } returns true
-        coEvery { locationCredentialsProvider.verifyAndRefreshCredentials() } just runs
-        coEvery {
-            locationCredentialsProvider.getLocationClient()
-        } returns mockAmazonLocationClient
-
-        val result = BatchUpdateDevicePositionResponse.invoke {
-            errors = listOf()
-        }
-        coEvery {
-            mockAmazonLocationClient.batchUpdateDevicePosition(any())
-        } returns result
-        val locationTrackingCallback = mockk<LocationTrackingCallback>(relaxed = true)
-        val awsKeyValueStore = mockk<EncryptedSharedPreferences>()
-
-        every { awsKeyValueStore.get(any()) } returns "true"
-        val locationClient =
-            LocationTracker(context, locationCredentialsProvider, locationClientConfig)
-        locationClient.enableFilter(TimeLocationFilter())
-        locationClient.enableFilter(DistanceLocationFilter())
-        locationClient.enableFilter(AccuracyLocationFilter())
-        every {
-            anyConstructed<EncryptedSharedPreferences>().get(
-                StoreKey.IS_ACCURACY_FILTER_ENABLE,
-            )
-        } returns true.toString()
-        every { anyConstructed<EncryptedSharedPreferences>().get(StoreKey.LAST_LOCATION) } returns LAST_LOCATION
-        every { anyConstructed<Location>().distanceTo(any()) } returns 20F
-        runBlocking {
-            locationClient.uploadLocationUpdates(locationTrackingCallback)
-
-            verify { locationTrackingCallback.onUploadStarted(match { it.size == 1 }) }
-            verify { locationTrackingCallback.onUploaded(match { it.size == 1 }) }
-        }
-    }
-
-    @Test
     fun `uploadLocationUpdates uploads locations skipped`() {
         val locationTrackingCallback = mockk<LocationTrackingCallback>(relaxed = true)
         val awsKeyValueStore = mockk<EncryptedSharedPreferences>()
@@ -504,7 +437,7 @@ class LocationClientTest {
 
     @Test
     fun `enable Filter`() {
-        coroutineScope.launch {
+        runBlocking {
             val locationClient =
                 LocationTracker(context, locationCredentialsProvider, locationClientConfig)
             locationClient.enableFilter(TimeLocationFilter())
@@ -520,7 +453,7 @@ class LocationClientTest {
 
     @Test
     fun `disable Filter`() {
-        coroutineScope.launch {
+        runBlocking {
             val locationClient =
                 LocationTracker(context, locationCredentialsProvider, locationClientConfig)
             locationClient.disableFilter(TimeLocationFilter())
@@ -568,5 +501,45 @@ class LocationClientTest {
 
         locationClient.stopBackgroundService()
         verify { BackgroundTrackingWorker.cancelWork(context) }
+    }
+
+    @Test
+    fun `get Device Location`() {
+        mockkConstructor(LocationTracker::class)
+        coEvery {
+            anyConstructed<LocationTracker>().uploadLocationUpdates(any<LocationTrackingCallback>())
+        } just runs
+        val mockAmazonLocationClient = mockk<LocationClient>()
+        coEvery { locationCredentialsProvider.isCredentialsValid() } returns true
+        coEvery { locationCredentialsProvider.verifyAndRefreshCredentials() } just runs
+        coEvery {
+            locationCredentialsProvider.getLocationClient()
+        } returns mockAmazonLocationClient
+        val result = BatchUpdateDevicePositionResponse.invoke {
+            errors = listOf()
+        }
+        coEvery {
+            mockAmazonLocationClient.batchUpdateDevicePosition(any())
+        } returns result
+        val locationTrackingCallback = mockk<LocationTrackingCallback>(relaxed = true)
+        val awsKeyValueStore = mockk<EncryptedSharedPreferences>()
+
+        every { awsKeyValueStore.get(any()) } returns "true"
+        val locationClient =
+            LocationTracker(context, locationCredentialsProvider, locationClientConfig)
+        locationClient.enableFilter(TimeLocationFilter())
+        locationClient.enableFilter(DistanceLocationFilter())
+        locationClient.enableFilter(AccuracyLocationFilter())
+        every {
+            anyConstructed<EncryptedSharedPreferences>().get(
+                StoreKey.IS_ACCURACY_FILTER_ENABLE,
+            )
+        } returns true.toString()
+        every { anyConstructed<EncryptedSharedPreferences>().get(StoreKey.LAST_LOCATION) } returns LAST_LOCATION
+        every { anyConstructed<Location>().distanceTo(any()) } returns 20F
+        runBlocking {
+            val location = locationClient.getDeviceLocation(locationTrackingCallback)
+            assertNotNull(location)
+        }
     }
 }

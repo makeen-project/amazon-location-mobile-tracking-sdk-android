@@ -30,6 +30,7 @@ class DeviceIdProviderTest {
         context = mockk(relaxed = true)
         mockkConstructor(EncryptedSharedPreferences::class)
         every { anyConstructed<EncryptedSharedPreferences>().initEncryptedSharedPreferences() } just runs
+        every { anyConstructed<EncryptedSharedPreferences>().clear() } just runs
         every { anyConstructed<EncryptedSharedPreferences>().get(any()) } returns "mockDeviceID"
         every { anyConstructed<EncryptedSharedPreferences>().contains(StoreKey.DEVICE_ID) } returns true
         deviceIdProvider = DeviceIdProvider.getInstance(context)
